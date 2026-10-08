@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Pre-market</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10141a;
+      --card: #181d27;
+      --line: #2a3142;
+      --text: #e7ecf3;
+      --muted: #8b95a8;
+      --up: #1fad6b;
+      --down: #e24b4b;
+      --flat: #8b95a8;
+      --close: #6d7890;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    #status {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 18px;
+      height: 3px;
+      margin: 0 6px 0 14px;
+      vertical-align: middle;
+      border-radius: 2px;
+    }
+
+    .swatch.up { background: var(--up); }
+    .swatch.down { background: var(--down); }
+    .swatch.close {
+      height: 0;
+      border-top: 2px dashed var(--close);
+      background: none;
+      width: 18px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 14px 12px;
+      min-width: 0;
+      box-shadow: inset 0 3px 0 #3a4254;
+    }
+
+    .card.move-up { box-shadow: inset 0 3px 0 var(--up); }
+    .card.move-down { box-shadow: inset 0 3px 0 var(--down); }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.02em;
+    }
+
+    .company {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 360px;
+    }
+
+    .pill {
+      flex: none;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #243044;
+      color: #9eb4d4;
+    }
+
+    .pill.warn {
+      background: #3a2a22;
+      color: #e0b089;
+    }
+
+    .body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 168px;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .chart-wrap { min-width: 0; }
+
+    canvas {
+      width: 100%;
+      height: 168px;
+      display: block;
+    }
+
+    .note {
+      margin: 6px 0 0;
+      color: #e0b089;
+      font-size: 12px;
+    }
+
+    .stats { margin: 0; }
+
+    .stat + .stat { margin-top: 12px; }
+
+    dt {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      margin: 2px 0 0;
+      color: var(--text);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 16px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .price-value { font-size: 26px; }
+
+    .pct { margin-left: 6px; }
+
+    .asof {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+    .flat { color: var(--text); }
+
+    @media (max-width: 640px) {
+      header { flex-direction: column; align-items: flex-start; }
+      .board { grid-template-columns: 1fr; }
+      .body { grid-template-columns: 1fr; }
+      .company { max-width: 220px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Pre-market</h1>
+        <p id="status">Loading quotes…</p>
+      </div>
+      <p class="legend"><span class="swatch up"></span>Up<span class="swatch down"></span>Down<span class="swatch close"></span>Close</p>
+    </header>
+    <main id="board" class="board"></main>
+  </div>
+  <script>
+    const UP = "#1fad6b";
+    const DOWN = "#e24b4b";
+    const FLAT = "#8b95a8";
+    const CLOSE = "#6d7890";
+
+    const cards = new Map();
+    let latest = null;
+
+    function el(tag, className) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      return node;
+    }
+
+    function finite(value) {
+      return typeof value === "number" && Number.isFinite(value);
+    }
+
+    function formatPrice(value) {
+      if (!finite(value)) return "—";
+      return "$" + value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function formatSigned(value, prefix) {
+      if (!finite(value)) return "—";
+      const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+      const abs = Math.abs(value).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return sign + prefix + abs;
+    }
+
+    function formatPct(value) {
+      if (!finite(value)) return "—";
+      const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+      return sign + Math.abs(value).toFixed(2) + "%";
+    }
+
+    function tone(value) {
+      if (!finite(value) || value === 0) return "flat";
+      return value > 0 ? "up" : "down";
+    }
+
+    function direction(previous, current) {
+      if (current > previous) return UP;
+      if (current < previous) return DOWN;
+      return FLAT;
+    }
+
+    function formatClock(epochSeconds) {
+      return new Date(epochSeconds * 1000).toLocaleTimeString();
+    }
+
+    function ensureCard(symbol) {
+      if (cards.has(symbol)) return cards.get(symbol);
+
+      const article = el("article", "card");
+      const head = el("div", "head");
+      const titleWrap = el("div");
+      const title = el("h2");
+      title.textContent = symbol;
+      const company = el("p", "company");
+      titleWrap.append(title, company);
+      const pill = el("span", "pill");
+      head.append(titleWrap, pill);
+
+      const body = el("div", "body");
+      const chartWrap = el("div", "chart-wrap");
+      const canvas = el("canvas");
+      canvas.setAttribute("role", "img");
+      const note = el("p", "note");
+      note.hidden = true;
+      chartWrap.append(canvas, note);
+
+      const stats = el("dl", "stats");
+      const priceStat = el("div", "stat");
+      const priceLabel = el("dt");
+      priceLabel.textContent = "Pre-market";
+      const priceValue = el("dd", "price-value");
+      const asof = el("p", "asof");
+      priceStat.append(priceLabel, priceValue, asof);
+
+      const closeStat = el("div", "stat");
+      const closeLabel = el("dt");
+      closeLabel.textContent = "Close";
+      const closeValue = el("dd");
+      closeStat.append(closeLabel, closeValue);
+
+      const deltaStat = el("div", "stat");
+      const deltaLabel = el("dt");
+      deltaLabel.textContent = "Delta";
+      const deltaValue = el("dd");
+      const deltaPrice = el("span");
+      const deltaPct = el("span", "pct");
+      deltaValue.append(deltaPrice, deltaPct);
+      deltaStat.append(deltaLabel, deltaValue);
+
+      stats.append(priceStat, closeStat, deltaStat);
+      body.append(chartWrap, stats);
+      article.append(head, body);
+      document.getElementById("board").append(article);
+
+      const record = {
+        article, company, pill, canvas, note, title,
+        priceLabel, priceValue, asof, closeValue, deltaPrice, deltaPct,
+        quote: null,
+      };
+      const observer = new ResizeObserver(() => {
+        if (record.quote) draw(record.canvas, record.quote);
+      });
+      observer.observe(canvas);
+      cards.set(symbol, record);
+      return record;
+    }
+
+    function updateCard(record, quote) {
+      record.quote = quote;
+      record.company.textContent = quote.company || "";
+      record.pill.textContent = quote.market_status || "—";
+      record.pill.classList.toggle("warn", !quote.recording);
+      record.priceLabel.textContent = quote.recording ? "Pre-market" : (quote.market_status || "Last");
+      record.priceValue.textContent = formatPrice(quote.price);
+      const deltaTone = tone(quote.delta);
+      record.title.classList.remove("up", "down", "flat");
+      record.title.classList.add(deltaTone);
+      record.priceValue.className = "price-value " + deltaTone;
+      record.asof.textContent = quote.as_of || "";
+      record.closeValue.textContent = formatPrice(quote.close);
+      record.deltaPrice.textContent = formatSigned(quote.delta, "$");
+      record.deltaPct.textContent = formatPct(quote.delta_pct);
+      record.deltaPrice.className = deltaTone;
+      record.deltaPct.className = "pct " + deltaTone;
+      record.article.classList.remove("move-up", "move-down", "move-flat");
+      record.article.classList.add("move-" + deltaTone);
+
+      const bits = [];
+      if (quote.error) bits.push(quote.error);
+      if (!quote.recording) {
+        const status = quote.market_status || "unknown";
+        bits.push(
+          quote.points && quote.points.length
+            ? "Recording paused — " + status
+            : "Waiting for pre-market — " + status
+        );
+      }
+      record.note.hidden = bits.length === 0;
+      record.note.textContent = bits.join(" · ");
+      record.canvas.setAttribute(
+        "aria-label",
+        quote.symbol + " pre-market chart, " + ((quote.points && quote.points.length) || 0) + " samples"
+      );
+      draw(record.canvas, quote);
+    }
+
+    function draw(canvas, quote) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const width = rect.width;
+      const height = rect.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const points = quote.points || [];
+      if (!points.length) return;
+
+      const padL = 8;
+      const padR = 8;
+      const padT = 16;
+      const padB = 22;
+      const prices = points.map((point) => point.p);
+      let min = Math.min(...prices);
+      let max = Math.max(...prices);
+      if (min === max) {
+        const pad = Math.abs(min) * 0.0015 || 0.01;
+        min -= pad;
+        max += pad;
+      } else {
+        const pad = (max - min) * 0.2;
+        min -= pad;
+        max += pad;
+      }
+
+      const close = quote.close;
+      const first = points[0].t;
+      const last = points[points.length - 1].t;
+      const span = last - first || 1;
+      const x = (t) => padL + ((t - first) / span) * (width - padL - padR);
+      const y = (price) => padT + ((max - price) / (max - min)) * (height - padT - padB);
+
+      if (finite(close) && close >= min && close <= max) {
+        ctx.save();
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = CLOSE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const closeY = y(close);
+        ctx.moveTo(padL, closeY);
+        ctx.lineTo(width - padR, closeY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      let lastColor = FLAT;
+      if (points.length === 1) {
+        lastColor = finite(close) ? direction(close, points[0].p) : FLAT;
+      }
+      for (let i = 1; i < points.length; i++) {
+        lastColor = direction(points[i - 1].p, points[i].p);
+        ctx.beginPath();
+        ctx.strokeStyle = lastColor;
+        ctx.moveTo(x(points[i - 1].t), y(points[i - 1].p));
+        ctx.lineTo(x(points[i].t), y(points[i].p));
+        ctx.stroke();
+      }
+
+      const end = points[points.length - 1];
+      ctx.fillStyle = lastColor;
+      ctx.beginPath();
+      ctx.arc(x(end.t), y(end.p), 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#8b95a8";
+      ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.textBaseline = "bottom";
+      ctx.textAlign = "left";
+      ctx.fillText(formatClock(points[0].t), padL, height - 2);
+      ctx.textAlign = "right";
+      ctx.fillText(formatClock(points[points.length - 1].t), width - padR, height - 2);
+    }
+
+    function render(data) {
+      latest = data;
+      const every = Number.isInteger(data.interval) ? String(data.interval) : String(data.interval);
+      document.getElementById("status").textContent =
+        "Since " + formatClock(data.started_at) +
+        " · updated " + formatClock(data.server_time) +
+        " · every " + every + "s";
+      for (const quote of data.quotes || []) {
+        updateCard(ensureCard(quote.symbol), quote);
+      }
+    }
+
+    window.addEventListener("resize", () => {
+      if (!latest) return;
+      for (const quote of latest.quotes || []) {
+        const record = cards.get(quote.symbol);
+        if (record) draw(record.canvas, quote);
+      }
+    });
+
+    const source = new EventSource("/events");
+    source.onmessage = (event) => {
+      try {
+        render(JSON.parse(event.data));
+      } catch (error) {
+        document.getElementById("status").textContent = "Could not read quote update";
+      }
+    };
+    source.onerror = () => {
+      document.getElementById("status").textContent = "Reconnecting…";
+    };
+  </script>
+</body>
+</html>
