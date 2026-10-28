@@ -78,11 +78,26 @@ def load_board():
     if isinstance(raw_buys, dict):
         for key, value in raw_buys.items():
             symbol = normalize_symbol(str(key))
-            price = to_float(value)
-            if symbol and price is not None and price > 0:
-                buys[symbol] = price
+            position = parse_position(value)
+            if symbol and position:
+                buys[symbol] = position
     logger.info("Loaded %s symbols: %s", len(symbols), ", ".join(symbols))
     return symbols, buys
+
+
+def parse_position(value):
+    """A buy is a price, plus an optional share count. A bare number is price only."""
+    if isinstance(value, dict):
+        price = to_float(value.get("price"))
+        shares = to_float(value.get("shares"))
+    else:
+        price = to_float(value)
+        shares = None
+    if price is None or price <= 0:
+        return None
+    if shares is not None and shares <= 0:
+        shares = None
+    return {"price": price, "shares": shares}
 
 
 def format_buy(price):
@@ -99,10 +114,13 @@ def save_board(symbols, buys):
     priced = [(symbol, buys[symbol]) for symbol in symbols if symbol in buys]
     if priced:
         lines.append("")
-        lines.append("# Price paid per share")
+        lines.append("# Price paid per share, and how many shares")
         lines.append("buys:")
-        for symbol, price in priced:
-            lines.append(f"  {symbol}: {format_buy(price)}")
+        for symbol, position in priced:
+            lines.append(f"  {symbol}:")
+            lines.append(f"    price: {format_buy(position['price'])}")
+            if position.get("shares") is not None:
+                lines.append(f"    shares: {format_buy(position['shares'])}")
     text = "\n".join(lines) + "\n"
     tmp = YAML_PATH.with_suffix(".yaml.tmp")
     tmp.write_text(text, encoding="utf-8")
@@ -284,7 +302,8 @@ async def refresh(state, session):
                 "delta": delta,
                 "delta_pct": delta_pct,
                 "as_of": latest.get("as_of"),
-                "buy": state.buys.get(symbol),
+                "buy": (state.buys.get(symbol) or {}).get("price"),
+                "shares": (state.buys.get(symbol) or {}).get("shares"),
                 "points": history,
                 "error": error,
             }
@@ -446,17 +465,28 @@ async def set_buy(request):
     if body is None or "price" not in body:
         return json_error("Send a buy price", 400)
     raw = body.get("price")
-    if raw is None or raw == "":
+    raw_shares = body.get("shares")
+    price_blank = raw is None or raw == ""
+    shares_blank = raw_shares is None or raw_shares == ""
+    if price_blank and shares_blank:
         state.buys.pop(symbol, None)
         price = None
+        shares = None
+    elif price_blank:
+        return json_error("Enter the price you paid, or leave both fields blank to follow only", 400)
     else:
         price = to_float(raw)
         if price is None or price <= 0:
             return json_error("Buy price must be above 0", 400)
-        state.buys[symbol] = price
+        shares = None
+        if not shares_blank:
+            shares = to_float(raw_shares)
+            if shares is None or shares <= 0:
+                return json_error("Share count must be above 0", 400)
+        state.buys[symbol] = {"price": price, "shares": shares}
     save_board(state.symbols, state.buys)
-    logger.info("Buy price for %s set to %s", symbol, price)
-    return web.json_response({"symbol": symbol, "buy": price})
+    logger.info("Buy for %s set to price %s, shares %s", symbol, price, shares)
+    return web.json_response({"symbol": symbol, "buy": price, "shares": shares})
 
 
 class BoardState:
