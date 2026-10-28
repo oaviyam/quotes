@@ -14,4 +14,13 @@ symbols:
   - QCOM
   - MRVL
   - SPCX
- 
+  - SWMR
+  - META
+
+# Price paid per share
+buys:
+  SNDK: 1706.54
+  MU: 1062.32
+  NVDA: 216.98
+  MRVL: 282.07
+  SWMR: 34.06

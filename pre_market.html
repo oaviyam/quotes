@@ -29,9 +29,9 @@
     }
 
     .wrap {
-      max-width: 1200px;
+      max-width: 1600px;
       margin: 0 auto;
-      padding: 28px 20px 48px;
+      padding: 16px 14px 32px;
     }
 
     header {
@@ -82,15 +82,15 @@
 
     .board {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 8px;
     }
 
     .card {
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 14px 14px 12px;
+      border-radius: 8px;
+      padding: 8px 10px 8px;
       min-width: 0;
       box-shadow: inset 0 3px 0 #3a4254;
     }
@@ -102,30 +102,33 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 4px;
     }
 
     h2 {
       margin: 0;
-      font-size: 18px;
+      font-size: 15px;
       letter-spacing: 0.02em;
     }
 
     .company {
-      margin: 2px 0 0;
+      margin: 1px 0 0;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 360px;
+      max-width: 180px;
     }
 
     .pill {
       flex: none;
-      font-size: 12px;
-      padding: 3px 8px;
+      max-width: 92px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 10px;
+      padding: 2px 6px;
       border-radius: 999px;
       background: #243044;
       color: #9eb4d4;
@@ -138,16 +141,16 @@
 
     .body {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 168px;
-      gap: 16px;
-      align-items: center;
+      grid-template-columns: 1fr;
+      gap: 4px;
+      align-items: stretch;
     }
 
     .chart-wrap { min-width: 0; }
 
     canvas {
       width: 100%;
-      height: 168px;
+      height: 64px;
       display: block;
     }
 
@@ -157,9 +160,16 @@
       font-size: 12px;
     }
 
-    .stats { margin: 0; }
+    .stats {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px 10px;
+    }
 
-    .stat + .stat { margin-top: 12px; }
+    .stat.price-stat { grid-column: 1 / -1; }
+
+    .stat + .stat { margin-top: 0; }
 
     dt {
       margin: 0;
@@ -170,24 +180,98 @@
     }
 
     dd {
-      margin: 2px 0 0;
+      margin: 1px 0 0;
       color: var(--text);
       font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
       font-variant-numeric: tabular-nums;
-      font-size: 16px;
+      font-size: 13px;
       font-weight: 600;
       white-space: nowrap;
     }
 
-    .price-value { font-size: 26px; }
+    .price-value { font-size: 18px; }
+
+    .follow { color: var(--muted); font-size: 12px; font-family: "Segoe UI", system-ui, sans-serif; font-weight: 500; }
 
     .pct { margin-left: 6px; }
 
-    .asof {
-      margin: 3px 0 0;
-      color: var(--muted);
-      font-size: 11px;
+    .add-form {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
     }
+
+    input {
+      font: inherit;
+      color: var(--text);
+      background: #10141a;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+
+    #add-symbol { width: 140px; text-transform: uppercase; }
+
+    button {
+      font: inherit;
+      color: var(--text);
+      background: #243044;
+      border: 0;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    button.danger {
+      background: #3a2228;
+      color: #ffb4b4;
+    }
+
+    button.edit-buy {
+      background: #243044;
+      color: var(--text);
+      font-size: 11px;
+      padding: 2px 8px;
+      margin-left: auto;
+    }
+
+    .add-message {
+      margin: 6px 0 0;
+      min-height: 1em;
+      color: #e0b089;
+      font-size: 12px;
+    }
+
+    h2[role="button"] { cursor: pointer; }
+
+    .title-wrap { min-width: 0; flex: 1; }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .actions[hidden] { display: none; }
+
+    .buy-line {
+      margin: 2px 0 0;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .editor {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .editor input { width: 88px; padding: 4px 6px; }
+
+    .editor[hidden] { display: none; }
+
+    .asof { display: none; }
 
     .up { color: var(--up); }
     .down { color: var(--down); }
@@ -196,7 +280,6 @@
     @media (max-width: 640px) {
       header { flex-direction: column; align-items: flex-start; }
       .board { grid-template-columns: 1fr; }
-      .body { grid-template-columns: 1fr; }
       .company { max-width: 220px; }
     }
   </style>
@@ -207,8 +290,13 @@
       <div>
         <h1>Pre-market</h1>
         <p id="status">Loading quotes…</p>
+        <form id="add-form" class="add-form">
+          <input id="add-symbol" name="symbol" placeholder="Add ticker" maxlength="10" autocomplete="off" aria-label="Ticker symbol">
+          <button type="submit">Add</button>
+        </form>
+        <p id="add-message" class="add-message"></p>
       </div>
-      <p class="legend"><span class="swatch up"></span>Up<span class="swatch down"></span>Down<span class="swatch close"></span>Close</p>
+      <p class="legend"><span class="swatch up"></span>Above close<span class="swatch down"></span>Below close<span class="swatch close"></span>Close</p>
     </header>
     <main id="board" class="board"></main>
   </div>
@@ -266,6 +354,43 @@
       return FLAT;
     }
 
+    // Color follows the close, not the last tick. A print below the close stays
+    // red even when it is higher than the previous pre-market print.
+    function colorAgainstClose(price, closePrice) {
+      if (!finite(closePrice) || !finite(price) || price === closePrice) return FLAT;
+      return price > closePrice ? UP : DOWN;
+    }
+
+    function strokeLeg(ctx, x1, y1, x2, y2, color) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function strokeSegment(ctx, x1, y1, p1, x2, y2, p2, closePrice) {
+      if (!finite(closePrice)) {
+        const color = direction(p1, p2);
+        strokeLeg(ctx, x1, y1, x2, y2, color);
+        return color;
+      }
+      const startColor = colorAgainstClose(p1, closePrice);
+      const endColor = colorAgainstClose(p2, closePrice);
+      const crosses = startColor !== FLAT && endColor !== FLAT && startColor !== endColor && p1 !== p2;
+      if (!crosses) {
+        const color = endColor !== FLAT ? endColor : startColor;
+        strokeLeg(ctx, x1, y1, x2, y2, color);
+        return color;
+      }
+      const ratio = (closePrice - p1) / (p2 - p1);
+      const xClose = x1 + (x2 - x1) * ratio;
+      const yClose = y1 + (y2 - y1) * ratio;
+      strokeLeg(ctx, x1, y1, xClose, yClose, startColor);
+      strokeLeg(ctx, xClose, yClose, x2, y2, endColor);
+      return endColor;
+    }
+
     function formatClock(epochSeconds) {
       return new Date(epochSeconds * 1000).toLocaleTimeString();
     }
@@ -275,11 +400,27 @@
 
       const article = el("article", "card");
       const head = el("div", "head");
-      const titleWrap = el("div");
+      const titleWrap = el("div", "title-wrap");
+      const titleRow = el("div", "title-row");
       const title = el("h2");
       title.textContent = symbol;
+      title.tabIndex = 0;
+      title.setAttribute("role", "button");
+      title.setAttribute("aria-expanded", "false");
+      title.title = "Show delete";
+      const actions = el("div", "actions");
+      actions.hidden = true;
+      const deleteBtn = el("button", "danger");
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "Delete";
+      actions.append(deleteBtn);
+      const editBtn = el("button", "edit-buy");
+      editBtn.type = "button";
+      editBtn.textContent = "Edit";
+      editBtn.title = "Set the price you paid. Leave it blank to follow only.";
+      titleRow.append(title, editBtn, actions);
       const company = el("p", "company");
-      titleWrap.append(title, company);
+      titleWrap.append(titleRow, company);
       const pill = el("span", "pill");
       head.append(titleWrap, pill);
 
@@ -292,7 +433,7 @@
       chartWrap.append(canvas, note);
 
       const stats = el("dl", "stats");
-      const priceStat = el("div", "stat");
+      const priceStat = el("div", "stat price-stat");
       const priceLabel = el("dt");
       priceLabel.textContent = "Pre-market";
       const priceValue = el("dd", "price-value");
@@ -314,16 +455,52 @@
       deltaValue.append(deltaPrice, deltaPct);
       deltaStat.append(deltaLabel, deltaValue);
 
-      stats.append(priceStat, closeStat, deltaStat);
+      const buyStat = el("div", "stat");
+      const buyLabel = el("dt");
+      buyLabel.textContent = "Bought";
+      const buyValue = el("dd");
+      const buyLine = el("p", "buy-line");
+      const editor = el("form", "editor");
+      editor.hidden = true;
+      const buyInput = el("input");
+      buyInput.type = "number";
+      buyInput.min = "0";
+      buyInput.step = "0.01";
+      buyInput.placeholder = "Optional";
+      buyInput.setAttribute("aria-label", "Buying price for " + symbol);
+      const saveBtn = el("button");
+      saveBtn.type = "submit";
+      saveBtn.textContent = "Save";
+      editor.append(buyInput, saveBtn);
+      buyStat.append(buyLabel, buyValue, buyLine, editor);
+
+      stats.append(priceStat, closeStat, deltaStat, buyStat);
       body.append(chartWrap, stats);
       article.append(head, body);
-      document.getElementById("board").append(article);
 
       const record = {
-        article, company, pill, canvas, note, title,
+        article, company, pill, canvas, note, title, actions, deleteBtn,
         priceLabel, priceValue, asof, closeValue, deltaPrice, deltaPct,
+        buyValue, buyLine, editBtn, editor, buyInput,
         quote: null,
       };
+      function toggleActions() {
+        actions.hidden = !actions.hidden;
+        title.setAttribute("aria-expanded", actions.hidden ? "false" : "true");
+      }
+      title.addEventListener("click", toggleActions);
+      title.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleActions();
+        }
+      });
+      deleteBtn.addEventListener("click", () => removeTicker(symbol, record));
+      editBtn.addEventListener("click", () => openBuyEditor(record));
+      editor.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveBuy(symbol, record);
+      });
       const observer = new ResizeObserver(() => {
         if (record.quote) draw(record.canvas, record.quote);
       });
@@ -332,25 +509,48 @@
       return record;
     }
 
+    function setText(node, text) {
+      if (node.textContent !== text) node.textContent = text;
+    }
+
     function updateCard(record, quote) {
       record.quote = quote;
-      record.company.textContent = quote.company || "";
-      record.pill.textContent = quote.market_status || "—";
+      setText(record.company, quote.company || "");
+      setText(record.pill, quote.market_status || "—");
       record.pill.classList.toggle("warn", !quote.recording);
-      record.priceLabel.textContent = quote.recording ? "Pre-market" : (quote.market_status || "Last");
-      record.priceValue.textContent = formatPrice(quote.price);
+      setText(record.priceLabel, quote.recording ? "Pre-market" : (quote.market_status || "Last"));
+      setText(record.priceValue, formatPrice(quote.price));
       const deltaTone = tone(quote.delta);
       record.title.classList.remove("up", "down", "flat");
       record.title.classList.add(deltaTone);
-      record.priceValue.className = "price-value " + deltaTone;
-      record.asof.textContent = quote.as_of || "";
-      record.closeValue.textContent = formatPrice(quote.close);
-      record.deltaPrice.textContent = formatSigned(quote.delta, "$");
-      record.deltaPct.textContent = formatPct(quote.delta_pct);
-      record.deltaPrice.className = deltaTone;
-      record.deltaPct.className = "pct " + deltaTone;
+      const priceClass = "price-value " + deltaTone;
+      if (record.priceValue.className !== priceClass) record.priceValue.className = priceClass;
+      setText(record.asof, quote.as_of || "");
+      setText(record.closeValue, formatPrice(quote.close));
+      setText(record.deltaPrice, formatSigned(quote.delta, "$"));
+      setText(record.deltaPct, formatPct(quote.delta_pct));
+      if (record.deltaPrice.className !== deltaTone) record.deltaPrice.className = deltaTone;
+      const pctClass = "pct " + deltaTone;
+      if (record.deltaPct.className !== pctClass) record.deltaPct.className = pctClass;
       record.article.classList.remove("move-up", "move-down", "move-flat");
       record.article.classList.add("move-" + deltaTone);
+      if (record.editor.hidden) {
+        if (finite(quote.buy)) {
+          record.buyValue.classList.remove("follow");
+          setText(record.buyValue, formatPrice(quote.buy));
+        } else {
+          record.buyValue.classList.add("follow");
+          setText(record.buyValue, "Follow only");
+        }
+      }
+      const buyDelta = finite(quote.buy) && finite(quote.price) ? quote.price - quote.buy : null;
+      const buyPct = finite(buyDelta) && quote.buy ? (buyDelta / quote.buy) * 100 : null;
+      record.buyLine.hidden = !finite(buyDelta);
+      setText(record.buyLine, finite(buyDelta)
+        ? formatSigned(buyDelta, "$") + "  " + formatPct(buyPct)
+        : "");
+      const buyClass = "buy-line " + tone(buyDelta);
+      if (record.buyLine.className !== buyClass) record.buyLine.className = buyClass;
 
       const bits = [];
       if (quote.error) bits.push(quote.error);
@@ -364,23 +564,45 @@
       }
       record.note.hidden = bits.length === 0;
       record.note.textContent = bits.join(" · ");
+      const chartKey = chartSignature(quote, record.canvas);
       record.canvas.setAttribute(
         "aria-label",
         quote.symbol + " pre-market chart, " + ((quote.points && quote.points.length) || 0) + " samples"
       );
-      draw(record.canvas, quote);
+      if (record.chartKey !== chartKey) {
+        record.chartKey = chartKey;
+        draw(record.canvas, quote);
+      }
+    }
+
+    function chartSignature(quote, canvas) {
+      const points = quote.points || [];
+      const last = points[points.length - 1];
+      return [
+        points.length,
+        last ? last.t : "",
+        last ? last.p : "",
+        quote.close,
+        canvas.clientWidth,
+        canvas.clientHeight,
+        window.devicePixelRatio || 1,
+      ].join("|");
     }
 
     function draw(canvas, quote) {
       const rect = canvas.getBoundingClientRect();
       if (rect.width < 2 || rect.height < 2) return;
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
-      const ctx = canvas.getContext("2d");
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const width = rect.width;
       const height = rect.height;
+      const nextWidth = Math.round(width * dpr);
+      const nextHeight = Math.round(height * dpr);
+      if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+      }
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
       const points = quote.points || [];
@@ -426,17 +648,14 @@
       ctx.lineWidth = 2.5;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
-      let lastColor = FLAT;
-      if (points.length === 1) {
-        lastColor = finite(close) ? direction(close, points[0].p) : FLAT;
-      }
+      let lastColor = colorAgainstClose(points[0].p, close);
       for (let i = 1; i < points.length; i++) {
-        lastColor = direction(points[i - 1].p, points[i].p);
-        ctx.beginPath();
-        ctx.strokeStyle = lastColor;
-        ctx.moveTo(x(points[i - 1].t), y(points[i - 1].p));
-        ctx.lineTo(x(points[i].t), y(points[i].p));
-        ctx.stroke();
+        lastColor = strokeSegment(
+          ctx,
+          x(points[i - 1].t), y(points[i - 1].p), points[i - 1].p,
+          x(points[i].t), y(points[i].p), points[i].p,
+          close
+        );
       }
 
       const end = points[points.length - 1];
@@ -454,15 +673,110 @@
       ctx.fillText(formatClock(points[points.length - 1].t), width - padR, height - 2);
     }
 
+    function boughtFirst(quotes) {
+      return quotes.slice().sort((left, right) => Number(!finite(left.buy)) - Number(!finite(right.buy)));
+    }
+
+    function placeCard(board, article, previous) {
+      if (previous) {
+        if (article.previousElementSibling !== previous) previous.after(article);
+      } else if (board.firstElementChild !== article) {
+        board.prepend(article);
+      }
+    }
+
     function render(data) {
       latest = data;
       const every = Number.isInteger(data.interval) ? String(data.interval) : String(data.interval);
-      document.getElementById("status").textContent =
+      setText(
+        document.getElementById("status"),
         "Since " + formatClock(data.started_at) +
         " · updated " + formatClock(data.server_time) +
-        " · every " + every + "s";
-      for (const quote of data.quotes || []) {
-        updateCard(ensureCard(quote.symbol), quote);
+        " · every " + every + "s"
+      );
+      const board = document.getElementById("board");
+      const seen = new Set();
+      let previous = null;
+      for (const quote of boughtFirst(data.quotes || [])) {
+        seen.add(quote.symbol);
+        const record = ensureCard(quote.symbol);
+        placeCard(board, record.article, previous);
+        previous = record.article;
+        updateCard(record, quote);
+      }
+      for (const symbol of [...cards.keys()]) {
+        if (seen.has(symbol)) continue;
+        cards.get(symbol).article.remove();
+        cards.delete(symbol);
+      }
+    }
+
+    function setAddMessage(text) {
+      document.getElementById("add-message").textContent = text || "";
+    }
+
+    async function addTicker(symbol) {
+      const response = await fetch("/api/tickers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Could not add ticker");
+      return body;
+    }
+
+    async function removeTicker(symbol, record) {
+      record.deleteBtn.disabled = true;
+      try {
+        const response = await fetch("/api/tickers/" + encodeURIComponent(symbol), { method: "DELETE" });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || "Could not delete ticker");
+        record.article.remove();
+        cards.delete(symbol);
+      } catch (error) {
+        record.deleteBtn.disabled = false;
+        setAddMessage(error.message);
+      }
+    }
+
+    function openBuyEditor(record) {
+      record.editor.hidden = false;
+      record.editBtn.hidden = true;
+      record.buyInput.value = finite(record.quote && record.quote.buy) ? String(record.quote.buy) : "";
+      record.buyInput.focus();
+    }
+
+    function closeBuyEditor(record) {
+      record.editor.hidden = true;
+      record.editBtn.hidden = false;
+    }
+
+    async function saveBuy(symbol, record) {
+      const raw = record.buyInput.value.trim();
+      const price = raw === "" ? null : Number(raw);
+      if (price !== null && (!Number.isFinite(price) || price <= 0)) {
+        setAddMessage("Enter the price you paid, or leave it blank to follow only");
+        return;
+      }
+      record.buyInput.disabled = true;
+      try {
+        const response = await fetch("/api/tickers/" + encodeURIComponent(symbol) + "/buy", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ price }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || "Could not save buy price");
+        record.quote.buy = body.buy;
+        closeBuyEditor(record);
+        if (latest) render(latest);
+        else updateCard(record, record.quote);
+        setAddMessage("");
+      } catch (error) {
+        setAddMessage(error.message);
+      } finally {
+        record.buyInput.disabled = false;
       }
     }
 
@@ -471,6 +785,27 @@
       for (const quote of latest.quotes || []) {
         const record = cards.get(quote.symbol);
         if (record) draw(record.canvas, quote);
+      }
+    });
+
+    document.getElementById("add-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = document.getElementById("add-symbol");
+      const symbol = input.value.trim().toUpperCase();
+      if (!symbol) {
+        setAddMessage("Enter a ticker");
+        return;
+      }
+      input.disabled = true;
+      try {
+        await addTicker(symbol);
+        input.value = "";
+        setAddMessage(symbol + " added");
+      } catch (error) {
+        setAddMessage(error.message);
+      } finally {
+        input.disabled = false;
+        input.focus();
       }
     });
 

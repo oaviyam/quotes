@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -33,25 +34,79 @@ from get_quote import GetQuote  # noqa: E402
 
 
 PAGE_PATH = Path(__file__).with_name("pre_market.html")
+YAML_PATH = Path(__file__).with_name("tickers.yaml")
+SYMBOL_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
 
-def load_symbols():
-    yaml_path = Path(__file__).with_name("tickers.yaml")
-    logger.debug("Loading symbols from %s", yaml_path)
+def normalize_symbol(value):
+    if not isinstance(value, str):
+        return None
+    symbol = value.strip().upper()
+    if not SYMBOL_RE.fullmatch(symbol):
+        return None
+    return symbol
+
+
+def load_board():
+    """Read tickers.yaml. Symbols stay a string list so the collector still works."""
+    logger.debug("Loading symbols from %s", YAML_PATH)
     try:
         import yaml
 
-        with yaml_path.open() as handle:
+        with YAML_PATH.open() as handle:
             config = yaml.safe_load(handle) or {}
-        symbols = config.get("symbols") or []
-        logger.info("Loaded %s symbols: %s", len(symbols), ", ".join(symbols))
-        return symbols
     except FileNotFoundError:
-        logger.error("tickers.yaml not found at %s", yaml_path)
-        return []
+        logger.error("tickers.yaml not found at %s", YAML_PATH)
+        return [], {}
     except Exception as exc:
         logger.error("Error reading tickers.yaml: %s", exc)
-        return []
+        return [], {}
+
+    symbols = []
+    for item in config.get("symbols") or []:
+        if isinstance(item, str):
+            symbol = normalize_symbol(item)
+        elif isinstance(item, dict):
+            symbol = normalize_symbol(str(item.get("symbol") or ""))
+        else:
+            symbol = None
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+
+    buys = {}
+    raw_buys = config.get("buys") or {}
+    if isinstance(raw_buys, dict):
+        for key, value in raw_buys.items():
+            symbol = normalize_symbol(str(key))
+            price = to_float(value)
+            if symbol and price is not None and price > 0:
+                buys[symbol] = price
+    logger.info("Loaded %s symbols: %s", len(symbols), ", ".join(symbols))
+    return symbols, buys
+
+
+def format_buy(price):
+    text = f"{price:.4f}".rstrip("0").rstrip(".")
+    if "." not in text:
+        text += ".0"
+    return text
+
+
+def save_board(symbols, buys):
+    lines = ["# Stock symbols to track", "symbols:"]
+    for symbol in symbols:
+        lines.append(f"  - {symbol}")
+    priced = [(symbol, buys[symbol]) for symbol in symbols if symbol in buys]
+    if priced:
+        lines.append("")
+        lines.append("# Price paid per share")
+        lines.append("buys:")
+        for symbol, price in priced:
+            lines.append(f"  {symbol}: {format_buy(price)}")
+    text = "\n".join(lines) + "\n"
+    tmp = YAML_PATH.with_suffix(".yaml.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(YAML_PATH)
 
 
 def to_float(value):
@@ -89,6 +144,7 @@ def parse_payload(payload):
     secondary = data.get("secondaryData") or {}
     price = to_float(primary.get("lastSalePrice"))
     close = to_float(secondary.get("lastSalePrice"))
+    close_as_of = secondary.get("lastTradeTimestamp") or ""
     delta = None
     delta_pct = None
     if price is not None and close not in (None, 0):
@@ -101,6 +157,8 @@ def parse_payload(payload):
         "market_status": data.get("marketStatus") or "",
         "price": price,
         "close": close,
+        "close_as_of": close_as_of,
+        "close_official": "closed" in close_as_of.lower(),
         "delta": delta,
         "delta_pct": delta_pct,
         "as_of": primary.get("lastTradeTimestamp") or "",
@@ -131,6 +189,36 @@ async def fetch_symbol(session, symbol):
     return symbol, parsed, error
 
 
+def remember_close(state, symbol, parsed):
+    """Keep the closing price from when the board starts.
+
+    Prefer the official prior close ("Closed at ...") over a secondary quote
+    that is still moving. Later polls do not shift the start of the graph.
+    """
+    close = parsed.get("close")
+    official = bool(parsed.get("close_official"))
+    locked = state.close_at_start.get(symbol)
+    if close is None:
+        return None if locked is None else locked["price"]
+    if locked is None:
+        state.close_at_start[symbol] = {"price": close, "official": official}
+        return close
+    if official and not locked["official"]:
+        locked["price"] = close
+        locked["official"] = True
+    return locked["price"]
+
+
+def place_close_anchor(history, close, started_at):
+    if close is None:
+        return
+    for point in history:
+        if point.get("anchor"):
+            point["p"] = close
+            return
+    history.insert(0, {"t": started_at, "p": close, "anchor": True})
+
+
 def publish(state, payload):
     state.snapshot = payload
     dead = []
@@ -156,17 +244,34 @@ async def refresh(state, session):
     now = time.time()
     quotes = []
     ok = 0
+    active = set(state.symbols)
     for symbol, parsed, error in results:
+        if symbol not in active:
+            continue
         history = state.history.setdefault(symbol, [])
         if error:
             logger.warning("%s: %s", symbol, error)
         elif parsed and parsed["price"] is not None:
             state.latest[symbol] = parsed
             if parsed["is_premarket"]:
+                # First point is the prior close. Prints collected after that stay
+                # red while they are under that close, even if they tick up.
+                close = remember_close(state, symbol, parsed)
+                place_close_anchor(history, close, state.started_at)
                 history.append({"t": now, "p": parsed["price"]})
                 ok += 1
         latest = state.latest.get(symbol) or {}
         source = parsed or latest
+        if parsed and parsed.get("close") is not None:
+            remember_close(state, symbol, parsed)
+        locked = state.close_at_start.get(symbol) or {}
+        display_close = locked.get("price", latest.get("close"))
+        price = latest.get("price")
+        delta = latest.get("delta")
+        delta_pct = latest.get("delta_pct")
+        if price is not None and display_close not in (None, 0):
+            delta = price - display_close
+            delta_pct = (delta / display_close) * 100
         recording = bool(parsed and parsed["is_premarket"] and parsed["price"] is not None)
         quotes.append(
             {
@@ -174,11 +279,12 @@ async def refresh(state, session):
                 "company": latest.get("company"),
                 "market_status": source.get("market_status"),
                 "recording": recording,
-                "price": latest.get("price"),
-                "close": latest.get("close"),
-                "delta": latest.get("delta"),
-                "delta_pct": latest.get("delta_pct"),
+                "price": price,
+                "close": display_close,
+                "delta": delta,
+                "delta_pct": delta_pct,
                 "as_of": latest.get("as_of"),
+                "buy": state.buys.get(symbol),
                 "points": history,
                 "error": error,
             }
@@ -284,25 +390,97 @@ async def favicon(_request):
     return web.Response(status=204)
 
 
+def json_error(message, status):
+    return web.json_response({"error": message}, status=status)
+
+
+async def read_body(request):
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        return None
+    return body if isinstance(body, dict) else None
+
+
+async def add_ticker(request):
+    body = await read_body(request)
+    if body is None:
+        return json_error("Send a ticker symbol", 400)
+    symbol = normalize_symbol(body.get("symbol") or "")
+    if not symbol:
+        return json_error("Enter a ticker like AAPL", 400)
+    state = request.app["state"]
+    if symbol in state.symbols:
+        return json_error(f"{symbol} is already on the board", 409)
+    state.symbols.append(symbol)
+    save_board(state.symbols, state.buys)
+    logger.info("Added %s", symbol)
+    return web.json_response({"symbol": symbol, "symbols": state.symbols})
+
+
+async def delete_ticker(request):
+    symbol = normalize_symbol(request.match_info["symbol"])
+    if not symbol:
+        return json_error("Unknown ticker", 400)
+    state = request.app["state"]
+    if symbol not in state.symbols:
+        return json_error(f"{symbol} is not on the board", 404)
+    state.symbols = [item for item in state.symbols if item != symbol]
+    state.buys.pop(symbol, None)
+    state.history.pop(symbol, None)
+    state.latest.pop(symbol, None)
+    state.close_at_start.pop(symbol, None)
+    save_board(state.symbols, state.buys)
+    logger.info("Removed %s", symbol)
+    return web.json_response({"symbol": symbol, "symbols": state.symbols})
+
+
+async def set_buy(request):
+    symbol = normalize_symbol(request.match_info["symbol"])
+    if not symbol:
+        return json_error("Unknown ticker", 400)
+    state = request.app["state"]
+    if symbol not in state.symbols:
+        return json_error(f"{symbol} is not on the board", 404)
+    body = await read_body(request)
+    if body is None or "price" not in body:
+        return json_error("Send a buy price", 400)
+    raw = body.get("price")
+    if raw is None or raw == "":
+        state.buys.pop(symbol, None)
+        price = None
+    else:
+        price = to_float(raw)
+        if price is None or price <= 0:
+            return json_error("Buy price must be above 0", 400)
+        state.buys[symbol] = price
+    save_board(state.symbols, state.buys)
+    logger.info("Buy price for %s set to %s", symbol, price)
+    return web.json_response({"symbol": symbol, "buy": price})
+
+
 class BoardState:
-    def __init__(self, symbols, interval, page):
-        self.symbols = symbols
+    def __init__(self, symbols, buys, interval, page):
+        self.symbols = list(symbols)
+        self.buys = dict(buys)
         self.interval = interval
         self.page = page
         self.history = {symbol: [] for symbol in symbols}
         self.latest = {}
+        self.close_at_start = {}
         self.subscribers = set()
         self.snapshot = None
         self.started_at = time.time()
         self.task = None
 
 
-def build_app(symbols, interval):
+def build_app(symbols, buys, interval):
     if not PAGE_PATH.is_file():
         raise FileNotFoundError(f"Missing page template: {PAGE_PATH}")
     app = web.Application()
     app["state"] = BoardState(
         symbols,
+        buys,
         interval,
         PAGE_PATH.read_text(encoding="utf-8"),
     )
@@ -310,6 +488,9 @@ def build_app(symbols, interval):
         [
             web.get("/", index),
             web.get("/api/quotes", api_quotes),
+            web.post("/api/tickers", add_ticker),
+            web.delete("/api/tickers/{symbol}", delete_ticker),
+            web.put("/api/tickers/{symbol}/buy", set_buy),
             web.get("/events", events),
             web.get("/favicon.ico", favicon),
         ]
@@ -342,11 +523,11 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
-    symbols = load_symbols()
+    symbols, buys = load_board()
     if not symbols:
         logger.error("No symbols to collect. Exiting.")
         return 1
-    app = build_app(symbols, args.interval)
+    app = build_app(symbols, buys, args.interval)
     logger.info(
         "Pre-market board at http://%s:%s  (every %ss, %s symbols)",
         args.host,
