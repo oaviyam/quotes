@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Pre-market</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10141a;
+      --card: #181d27;
+      --line: #2a3142;
+      --text: #e7ecf3;
+      --muted: #8b95a8;
+      --up: #1fad6b;
+      --down: #e24b4b;
+      --flat: #8b95a8;
+      --close: #6d7890;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    .wrap {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 16px 14px 32px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    #status {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 18px;
+      height: 3px;
+      margin: 0 6px 0 14px;
+      vertical-align: middle;
+      border-radius: 2px;
+    }
+
+    .swatch.up { background: var(--up); }
+    .swatch.down { background: var(--down); }
+    .swatch.close {
+      height: 0;
+      border-top: 2px dashed var(--close);
+      background: none;
+      width: 18px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px 8px;
+      min-width: 0;
+      box-shadow: inset 0 3px 0 #3a4254;
+    }
+
+    .card.move-up { box-shadow: inset 0 3px 0 var(--up); }
+    .card.move-down { box-shadow: inset 0 3px 0 var(--down); }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+    }
+
+    .company {
+      margin: 1px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 420px;
+    }
+
+    .pill {
+      flex: none;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #243044;
+      color: #9eb4d4;
+    }
+
+    .pill.warn {
+      background: #3a2a22;
+      color: #e0b089;
+    }
+
+    .body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .chart-wrap { min-width: 0; }
+
+    canvas {
+      width: 100%;
+      height: 64px;
+      display: block;
+    }
+
+    .note {
+      margin: 6px 0 0;
+      color: #e0b089;
+      font-size: 12px;
+    }
+
+    .stats {
+      margin: 0;
+      display: grid;
+      grid-template-columns: auto auto auto auto;
+      gap: 2px 16px;
+      align-items: end;
+    }
+
+    .stat.price-stat { grid-column: auto; }
+
+    .stat + .stat { margin-top: 0; }
+
+    dt {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      margin: 1px 0 0;
+      color: var(--text);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .price-value { font-size: 18px; }
+
+    .follow { color: var(--muted); font-size: 12px; font-family: "Segoe UI", system-ui, sans-serif; font-weight: 500; }
+
+    .pct { margin-left: 6px; }
+
+    .add-form {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    input {
+      font: inherit;
+      color: var(--text);
+      background: #10141a;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+
+    #add-symbol { width: 140px; text-transform: uppercase; }
+
+    button {
+      font: inherit;
+      color: var(--text);
+      background: #243044;
+      border: 0;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    button.danger {
+      background: #3a2228;
+      color: #ffb4b4;
+    }
+
+    button.edit-buy {
+      background: #243044;
+      color: var(--text);
+      font-size: 11px;
+      padding: 2px 8px;
+      margin-left: auto;
+    }
+
+    .add-message {
+      margin: 6px 0 0;
+      min-height: 1em;
+      color: #e0b089;
+      font-size: 12px;
+    }
+
+    h2[role="button"] { cursor: pointer; }
+
+    .title-wrap { min-width: 0; flex: 1; }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .actions[hidden] { display: none; }
+
+    .stat.buy-stat { grid-column: auto; }
+
+    .buy-line, .buy-total {
+      margin: 2px 0 0;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .editor {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .editor input { width: 78px; padding: 4px 6px; }
+
+    .editor[hidden] { display: none; }
+
+    .asof { display: none; }
+
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+    .flat { color: var(--text); }
+
+    @media (max-width: 640px) {
+      header { flex-direction: column; align-items: flex-start; }
+      .body { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr 1fr; }
+      .stat.price-stat, .stat.buy-stat { grid-column: 1 / -1; }
+      .company { max-width: 220px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Pre-market</h1>
+        <p id="status">Loading quotes…</p>
+        <form id="add-form" class="add-form">
+          <input id="add-symbol" name="symbol" placeholder="Add ticker" maxlength="10" autocomplete="off" aria-label="Ticker symbol">
+          <button type="submit">Add</button>
+        </form>
+        <p id="add-message" class="add-message"></p>
+      </div>
+      <p class="legend"><span class="swatch up"></span>Above close<span class="swatch down"></span>Below close<span class="swatch close"></span>Close</p>
+    </header>
+    <main id="board" class="board"></main>
+  </div>
+  <script>
+    const UP = "#1fad6b";
+    const DOWN = "#e24b4b";
+    const FLAT = "#8b95a8";
+    const CLOSE = "#6d7890";
+
+    const cards = new Map();
+    let latest = null;
+
+    function el(tag, className) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      return node;
+    }
+
+    function finite(value) {
+      return typeof value === "number" && Number.isFinite(value);
+    }
+
+    function formatShares(value) {
+      if (!finite(value)) return "";
+      return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+    }
+
+    function formatPrice(value) {
+      if (!finite(value)) return "—";
+      return "$" + value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function formatSigned(value, prefix) {
+      if (!finite(value)) return "—";
+      const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+      const abs = Math.abs(value).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return sign + prefix + abs;
+    }
+
+    function formatPct(value) {
+      if (!finite(value)) return "—";
+      const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+      return sign + Math.abs(value).toFixed(2) + "%";
+    }
+
+    function tone(value) {
+      if (!finite(value) || value === 0) return "flat";
+      return value > 0 ? "up" : "down";
+    }
+
+    function direction(previous, current) {
+      if (current > previous) return UP;
+      if (current < previous) return DOWN;
+      return FLAT;
+    }
+
+    // Color follows the close, not the last tick. A print below the close stays
+    // red even when it is higher than the previous pre-market print.
+    function colorAgainstClose(price, closePrice) {
+      if (!finite(closePrice) || !finite(price) || price === closePrice) return FLAT;
+      return price > closePrice ? UP : DOWN;
+    }
+
+    function strokeLeg(ctx, x1, y1, x2, y2, color) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function strokeSegment(ctx, x1, y1, p1, x2, y2, p2, closePrice) {
+      if (!finite(closePrice)) {
+        const color = direction(p1, p2);
+        strokeLeg(ctx, x1, y1, x2, y2, color);
+        return color;
+      }
+      const startColor = colorAgainstClose(p1, closePrice);
+      const endColor = colorAgainstClose(p2, closePrice);
+      const crosses = startColor !== FLAT && endColor !== FLAT && startColor !== endColor && p1 !== p2;
+      if (!crosses) {
+        const color = endColor !== FLAT ? endColor : startColor;
+        strokeLeg(ctx, x1, y1, x2, y2, color);
+        return color;
+      }
+      const ratio = (closePrice - p1) / (p2 - p1);
+      const xClose = x1 + (x2 - x1) * ratio;
+      const yClose = y1 + (y2 - y1) * ratio;
+      strokeLeg(ctx, x1, y1, xClose, yClose, startColor);
+      strokeLeg(ctx, xClose, yClose, x2, y2, endColor);
+      return endColor;
+    }
+
+    function formatClock(epochSeconds) {
+      return new Date(epochSeconds * 1000).toLocaleTimeString();
+    }
+
+    function ensureCard(symbol) {
+      if (cards.has(symbol)) return cards.get(symbol);
+
+      const article = el("article", "card");
+      const head = el("div", "head");
+      const titleWrap = el("div", "title-wrap");
+      const titleRow = el("div", "title-row");
+      const title = el("h2");
+      title.textContent = symbol;
+      title.tabIndex = 0;
+      title.setAttribute("role", "button");
+      title.setAttribute("aria-expanded", "false");
+      title.title = "Show delete";
+      const actions = el("div", "actions");
+      actions.hidden = true;
+      const deleteBtn = el("button", "danger");
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "Delete";
+      actions.append(deleteBtn);
+      const editBtn = el("button", "edit-buy");
+      editBtn.type = "button";
+      editBtn.textContent = "Edit";
+      editBtn.title = "Set the price and how many shares you bought. Leave both blank to follow only.";
+      titleRow.append(title, editBtn, actions);
+      const company = el("p", "company");
+      titleWrap.append(titleRow, company);
+      const pill = el("span", "pill");
+      head.append(titleWrap, pill);
+
+      const body = el("div", "body");
+      const chartWrap = el("div", "chart-wrap");
+      const canvas = el("canvas");
+      canvas.setAttribute("role", "img");
+      const note = el("p", "note");
+      note.hidden = true;
+      chartWrap.append(canvas, note);
+
+      const stats = el("dl", "stats");
+      const priceStat = el("div", "stat price-stat");
+      const priceLabel = el("dt");
+      priceLabel.textContent = "Pre-market";
+      const priceValue = el("dd", "price-value");
+      const asof = el("p", "asof");
+      priceStat.append(priceLabel, priceValue, asof);
+
+      const closeStat = el("div", "stat");
+      const closeLabel = el("dt");
+      closeLabel.textContent = "Close";
+      const closeValue = el("dd");
+      closeStat.append(closeLabel, closeValue);
+
+      const deltaStat = el("div", "stat");
+      const deltaLabel = el("dt");
+      deltaLabel.textContent = "Delta";
+      const deltaValue = el("dd");
+      const deltaPrice = el("span");
+      const deltaPct = el("span", "pct");
+      deltaValue.append(deltaPrice, deltaPct);
+      deltaStat.append(deltaLabel, deltaValue);
+
+      const buyStat = el("div", "stat buy-stat");
+      const buyLabel = el("dt");
+      buyLabel.textContent = "Bought";
+      const buyValue = el("dd");
+      const buyLine = el("p", "buy-line");
+      const totalLine = el("p", "buy-total");
+      totalLine.hidden = true;
+      const editor = el("form", "editor");
+      editor.hidden = true;
+      const buyInput = el("input");
+      buyInput.type = "number";
+      buyInput.min = "0";
+      buyInput.step = "0.01";
+      buyInput.placeholder = "Price";
+      buyInput.setAttribute("aria-label", "Buying price for " + symbol);
+      const sharesInput = el("input");
+      sharesInput.type = "number";
+      sharesInput.min = "0";
+      sharesInput.step = "any";
+      sharesInput.placeholder = "Shares";
+      sharesInput.setAttribute("aria-label", "Shares bought of " + symbol);
+      const saveBtn = el("button");
+      saveBtn.type = "submit";
+      saveBtn.textContent = "Save";
+      editor.append(buyInput, sharesInput, saveBtn);
+      buyStat.append(buyLabel, buyValue, buyLine, totalLine, editor);
+
+      stats.append(priceStat, closeStat, deltaStat, buyStat);
+      body.append(chartWrap, stats);
+      article.append(head, body);
+
+      const record = {
+        article, company, pill, canvas, note, title, actions, deleteBtn,
+        priceLabel, priceValue, asof, closeValue, deltaPrice, deltaPct,
+        buyValue, buyLine, totalLine, editBtn, editor, buyInput, sharesInput,
+        quote: null,
+      };
+      function toggleActions() {
+        actions.hidden = !actions.hidden;
+        title.setAttribute("aria-expanded", actions.hidden ? "false" : "true");
+      }
+      title.addEventListener("click", toggleActions);
+      title.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleActions();
+        }
+      });
+      deleteBtn.addEventListener("click", () => removeTicker(symbol, record));
+      editBtn.addEventListener("click", () => openBuyEditor(record));
+      editor.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveBuy(symbol, record);
+      });
+      const observer = new ResizeObserver(() => {
+        if (record.quote) draw(record.canvas, record.quote);
+      });
+      observer.observe(canvas);
+      cards.set(symbol, record);
+      return record;
+    }
+
+    function setText(node, text) {
+      if (node.textContent !== text) node.textContent = text;
+    }
+
+    function updateCard(record, quote) {
+      record.quote = quote;
+      setText(record.company, quote.company || "");
+      setText(record.pill, quote.market_status || "—");
+      record.pill.classList.toggle("warn", !quote.recording);
+      setText(record.priceLabel, quote.recording ? "Pre-market" : (quote.market_status || "Last"));
+      setText(record.priceValue, formatPrice(quote.price));
+      const deltaTone = tone(quote.delta);
+      record.title.classList.remove("up", "down", "flat");
+      record.title.classList.add(deltaTone);
+      const priceClass = "price-value " + deltaTone;
+      if (record.priceValue.className !== priceClass) record.priceValue.className = priceClass;
+      setText(record.asof, quote.as_of || "");
+      setText(record.closeValue, formatPrice(quote.close));
+      setText(record.deltaPrice, formatSigned(quote.delta, "$"));
+      setText(record.deltaPct, formatPct(quote.delta_pct));
+      if (record.deltaPrice.className !== deltaTone) record.deltaPrice.className = deltaTone;
+      const pctClass = "pct " + deltaTone;
+      if (record.deltaPct.className !== pctClass) record.deltaPct.className = pctClass;
+      record.article.classList.remove("move-up", "move-down", "move-flat");
+      record.article.classList.add("move-" + deltaTone);
+      if (record.editor.hidden) {
+        if (finite(quote.buy)) {
+          record.buyValue.classList.remove("follow");
+          const sharesText = finite(quote.shares) ? " × " + formatShares(quote.shares) : "";
+          setText(record.buyValue, formatPrice(quote.buy) + sharesText);
+        } else {
+          record.buyValue.classList.add("follow");
+          setText(record.buyValue, "Follow only");
+        }
+      }
+      const buyDelta = finite(quote.buy) && finite(quote.price) ? quote.price - quote.buy : null;
+      const buyPct = finite(buyDelta) && quote.buy ? (buyDelta / quote.buy) * 100 : null;
+      record.buyLine.hidden = !finite(buyDelta);
+      setText(record.buyLine, finite(buyDelta)
+        ? formatSigned(buyDelta, "$") + "  " + formatPct(buyPct)
+        : "");
+      const buyClass = "buy-line " + tone(buyDelta);
+      if (record.buyLine.className !== buyClass) record.buyLine.className = buyClass;
+      const total = finite(buyDelta) && finite(quote.shares) ? buyDelta * quote.shares : null;
+      record.totalLine.hidden = !finite(total);
+      setText(record.totalLine, finite(total) ? "Total " + formatSigned(total, "$") : "");
+      const totalClass = "buy-total " + tone(total);
+      if (record.totalLine.className !== totalClass) record.totalLine.className = totalClass;
+
+      const bits = [];
+      if (quote.error) bits.push(quote.error);
+      if (!quote.recording) {
+        const status = quote.market_status || "unknown";
+        bits.push(
+          quote.points && quote.points.length
+            ? "Recording paused — " + status
+            : "Waiting for pre-market — " + status
+        );
+      }
+      record.note.hidden = bits.length === 0;
+      record.note.textContent = bits.join(" · ");
+      const chartKey = chartSignature(quote, record.canvas);
+      record.canvas.setAttribute(
+        "aria-label",
+        quote.symbol + " pre-market chart, " + ((quote.points && quote.points.length) || 0) + " samples"
+      );
+      if (record.chartKey !== chartKey) {
+        record.chartKey = chartKey;
+        draw(record.canvas, quote);
+      }
+    }
+
+    function chartSignature(quote, canvas) {
+      const points = quote.points || [];
+      const last = points[points.length - 1];
+      return [
+        points.length,
+        last ? last.t : "",
+        last ? last.p : "",
+        quote.close,
+        canvas.clientWidth,
+        canvas.clientHeight,
+        window.devicePixelRatio || 1,
+      ].join("|");
+    }
+
+    function draw(canvas, quote) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) return;
+      const dpr = window.devicePixelRatio || 1;
+      const width = rect.width;
+      const height = rect.height;
+      const nextWidth = Math.round(width * dpr);
+      const nextHeight = Math.round(height * dpr);
+      if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+      }
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      const points = quote.points || [];
+      if (!points.length) return;
+
+      const padL = 8;
+      const padR = 8;
+      const padT = 16;
+      const padB = 22;
+      const prices = points.map((point) => point.p);
+      let min = Math.min(...prices);
+      let max = Math.max(...prices);
+      if (min === max) {
+        const pad = Math.abs(min) * 0.0015 || 0.01;
+        min -= pad;
+        max += pad;
+      } else {
+        const pad = (max - min) * 0.2;
+        min -= pad;
+        max += pad;
+      }
+
+      const close = quote.close;
+      const first = points[0].t;
+      const last = points[points.length - 1].t;
+      const span = last - first || 1;
+      const x = (t) => padL + ((t - first) / span) * (width - padL - padR);
+      const y = (price) => padT + ((max - price) / (max - min)) * (height - padT - padB);
+
+      if (finite(close) && close >= min && close <= max) {
+        ctx.save();
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = CLOSE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const closeY = y(close);
+        ctx.moveTo(padL, closeY);
+        ctx.lineTo(width - padR, closeY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      let lastColor = colorAgainstClose(points[0].p, close);
+      for (let i = 1; i < points.length; i++) {
+        lastColor = strokeSegment(
+          ctx,
+          x(points[i - 1].t), y(points[i - 1].p), points[i - 1].p,
+          x(points[i].t), y(points[i].p), points[i].p,
+          close
+        );
+      }
+
+      const end = points[points.length - 1];
+      ctx.fillStyle = lastColor;
+      ctx.beginPath();
+      ctx.arc(x(end.t), y(end.p), 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#8b95a8";
+      ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.textBaseline = "bottom";
+      ctx.textAlign = "left";
+      ctx.fillText(formatClock(points[0].t), padL, height - 2);
+      ctx.textAlign = "right";
+      ctx.fillText(formatClock(points[points.length - 1].t), width - padR, height - 2);
+    }
+
+    function boughtFirst(quotes) {
+      return quotes.slice().sort((left, right) => Number(!finite(left.buy)) - Number(!finite(right.buy)));
+    }
+
+    function placeCard(board, article, previous) {
+      if (previous) {
+        if (article.previousElementSibling !== previous) previous.after(article);
+      } else if (board.firstElementChild !== article) {
+        board.prepend(article);
+      }
+    }
+
+    function render(data) {
+      latest = data;
+      const every = Number.isInteger(data.interval) ? String(data.interval) : String(data.interval);
+      setText(
+        document.getElementById("status"),
+        "Since " + formatClock(data.started_at) +
+        " · updated " + formatClock(data.server_time) +
+        " · every " + every + "s" +
+        (pagesMode ? " · saved in this browser" : "")
+      );
+      const board = document.getElementById("board");
+      const seen = new Set();
+      let previous = null;
+      for (const quote of boughtFirst(data.quotes || [])) {
+        seen.add(quote.symbol);
+        const record = ensureCard(quote.symbol);
+        placeCard(board, record.article, previous);
+        previous = record.article;
+        updateCard(record, quote);
+      }
+      for (const symbol of [...cards.keys()]) {
+        if (seen.has(symbol)) continue;
+        cards.get(symbol).article.remove();
+        cards.delete(symbol);
+      }
+    }
+
+    function setAddMessage(text) {
+      document.getElementById("add-message").textContent = text || "";
+    }
+
+    const pagesMode = location.hostname.endsWith(".github.io") || location.protocol === "file:"
+      || new URLSearchParams(location.search).has("client");
+    const STORE_KEY = "pre-market-board";
+    const SYMBOL_RE = /^[A-Z][A-Z0-9.\-]{0,9}$/;
+    let clientBoard = loadClientBoard();
+    const clientHistory = {};
+    const clientLatest = {};
+    const clientStarted = Date.now() / 1000;
+    let clientBusy = false;
+
+    function loadClientBoard() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "");
+        const symbols = [];
+        for (const item of saved.symbols || []) {
+          const symbol = String(item || "").trim().toUpperCase();
+          if (SYMBOL_RE.test(symbol) && !symbols.includes(symbol)) symbols.push(symbol);
+        }
+        const buys = {};
+        const rawBuys = saved.buys || {};
+        for (const symbol of symbols) {
+          const position = rawBuys[symbol];
+          if (!position) continue;
+          const price = Number(position.price);
+          const shares = Number(position.shares);
+          if (!Number.isFinite(price) || price <= 0) continue;
+          buys[symbol] = {
+            price: price,
+            shares: Number.isFinite(shares) && shares > 0 ? shares : null,
+          };
+        }
+        return { symbols: symbols, buys: buys };
+      } catch (error) {
+        return { symbols: [], buys: {} };
+      }
+    }
+
+    function saveClientBoard() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(clientBoard));
+    }
+
+    function sessionOf(meta, now) {
+      const period = meta.currentTradingPeriod || {};
+      const inside = (span) => span && now >= span.start && now < span.end;
+      if (inside(period.pre)) return "pre";
+      if (inside(period.regular)) return "regular";
+      if (inside(period.post)) return "post";
+      return "closed";
+    }
+
+    function quoteFromMeta(symbol, meta, now, recordPoint) {
+      const session = sessionOf(meta, now);
+      const extended = finite(meta.fulldayPrice) ? meta.fulldayPrice : meta.regularMarketPrice;
+      const regular = finite(meta.regularMarketPrice) ? meta.regularMarketPrice : null;
+      const previous = finite(meta.previousClose) ? meta.previousClose
+        : (finite(meta.chartPreviousClose) ? meta.chartPreviousClose : null);
+      let price = regular;
+      let close = previous;
+      let status = "Closed";
+      let recording = false;
+      if (session === "pre") {
+        price = extended;
+        close = regular;
+        status = "Pre-Market";
+        recording = true;
+      } else if (session === "regular") {
+        price = regular;
+        close = previous;
+        status = "Open";
+      } else if (session === "post") {
+        price = extended;
+        close = regular;
+        status = "After-hours";
+      }
+      let points = clientHistory[symbol] || [];
+      if (recordPoint && recording && finite(price)) {
+        points = clientHistory[symbol] || (clientHistory[symbol] = []);
+        if (finite(close)) {
+          const anchor = points.find((point) => point.anchor);
+          if (anchor) anchor.p = close;
+          else points.unshift({ t: clientStarted, p: close, anchor: true });
+        }
+        points.push({ t: now, p: price });
+      }
+      const position = clientBoard.buys[symbol] || {};
+      let delta = null;
+      let deltaPct = null;
+      if (finite(price) && finite(close) && close !== 0) {
+        delta = price - close;
+        deltaPct = (delta / close) * 100;
+      }
+      return {
+        symbol: symbol,
+        company: meta.longName || meta.shortName || "",
+        market_status: status,
+        recording: recording,
+        price: finite(price) ? price : null,
+        close: finite(close) ? close : null,
+        delta: delta,
+        delta_pct: deltaPct,
+        as_of: "",
+        buy: finite(position.price) ? position.price : null,
+        shares: finite(position.shares) ? position.shares : null,
+        points: points,
+        error: null,
+      };
+    }
+
+    function emptyQuote(symbol, message) {
+      const position = clientBoard.buys[symbol] || {};
+      return {
+        symbol: symbol,
+        company: "",
+        market_status: "—",
+        recording: false,
+        price: null,
+        close: null,
+        delta: null,
+        delta_pct: null,
+        as_of: "",
+        buy: finite(position.price) ? position.price : null,
+        shares: finite(position.shares) ? position.shares : null,
+        points: clientHistory[symbol] || [],
+        error: message,
+      };
+    }
+
+    async function refreshClient() {
+      if (clientBusy) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return refreshClient();
+      }
+      clientBusy = true;
+      try {
+        const now = Date.now() / 1000;
+        const symbols = clientBoard.symbols.slice();
+        const metas = {};
+        let failure = "";
+        try {
+          if (symbols.length) {
+            const yahoo = "https://query1.finance.yahoo.com/v7/finance/spark?symbols="
+              + symbols.join(",")
+              + "&range=1d&interval=1d&includePrePost=true";
+            const response = await fetch("https://r.jina.ai/" + yahoo);
+            if (!response.ok) throw new Error("Quote service returned " + response.status);
+            const text = await response.text();
+            const start = text.indexOf("{");
+            const end = text.lastIndexOf("}");
+            if (start < 0 || end < start) throw new Error("Quote service returned an unexpected page");
+            const data = JSON.parse(text.slice(start, end + 1));
+            for (const item of (data.spark && data.spark.result) || []) {
+              const meta = item.response && item.response[0] && item.response[0].meta;
+              if (meta && item.symbol) metas[item.symbol] = meta;
+            }
+          }
+        } catch (error) {
+          failure = error.message || "Could not load quotes";
+        }
+        const quotes = symbols.map((symbol) => {
+          const meta = metas[symbol] || clientLatest[symbol];
+          if (!meta) return emptyQuote(symbol, failure || "No quote");
+          if (metas[symbol]) clientLatest[symbol] = meta;
+          const quote = quoteFromMeta(symbol, meta, now, Boolean(metas[symbol]));
+          if (!metas[symbol] && failure) quote.error = failure;
+          return quote;
+        });
+        render({
+          interval: 5,
+          started_at: clientStarted,
+          server_time: now,
+          quotes: quotes,
+        });
+        if (!symbols.length) setAddMessage("Add a ticker. This browser keeps the list for next time.");
+        else if (failure) setAddMessage(failure);
+      } finally {
+        clientBusy = false;
+      }
+    }
+
+    async function addTicker(symbol) {
+      if (pagesMode) {
+        if (!SYMBOL_RE.test(symbol)) throw new Error("Enter a ticker like AAPL");
+        if (clientBoard.symbols.includes(symbol)) throw new Error(symbol + " is already on the board");
+        clientBoard.symbols.push(symbol);
+        saveClientBoard();
+        await refreshClient();
+        return { symbol: symbol };
+      }
+      const response = await fetch("/api/tickers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Could not add ticker");
+      return body;
+    }
+
+    async function removeTicker(symbol, record) {
+      if (pagesMode) {
+        clientBoard.symbols = clientBoard.symbols.filter((item) => item !== symbol);
+        delete clientBoard.buys[symbol];
+        delete clientHistory[symbol];
+        delete clientLatest[symbol];
+        saveClientBoard();
+        record.article.remove();
+        cards.delete(symbol);
+        await refreshClient();
+        return;
+      }
+      record.deleteBtn.disabled = true;
+      try {
+        const response = await fetch("/api/tickers/" + encodeURIComponent(symbol), { method: "DELETE" });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || "Could not delete ticker");
+        record.article.remove();
+        cards.delete(symbol);
+      } catch (error) {
+        record.deleteBtn.disabled = false;
+        setAddMessage(error.message);
+      }
+    }
+
+    function openBuyEditor(record) {
+      record.editor.hidden = false;
+      record.editBtn.hidden = true;
+      const quote = record.quote;
+      record.buyInput.value = finite(quote && quote.buy) ? String(quote.buy) : "";
+      record.sharesInput.value = finite(quote && quote.shares) ? String(quote.shares) : "";
+      record.buyInput.focus();
+    }
+
+    function closeBuyEditor(record) {
+      record.editor.hidden = true;
+      record.editBtn.hidden = false;
+    }
+
+    async function saveBuy(symbol, record) {
+      const raw = record.buyInput.value.trim();
+      const rawShares = record.sharesInput.value.trim();
+      const price = raw === "" ? null : Number(raw);
+      const shares = rawShares === "" ? null : Number(rawShares);
+      if (price === null && shares !== null) {
+        setAddMessage("Enter the price you paid, or leave both blank to follow only");
+        return;
+      }
+      if (price !== null && (!Number.isFinite(price) || price <= 0)) {
+        setAddMessage("Enter the price you paid, or leave both blank to follow only");
+        return;
+      }
+      if (shares !== null && (!Number.isFinite(shares) || shares <= 0)) {
+        setAddMessage("Enter how many shares you bought, or leave that blank");
+        return;
+      }
+      record.buyInput.disabled = true;
+      record.sharesInput.disabled = true;
+      try {
+        if (pagesMode) {
+          if (price === null) delete clientBoard.buys[symbol];
+          else clientBoard.buys[symbol] = { price: price, shares: shares };
+          saveClientBoard();
+          if (!record.quote) record.quote = emptyQuote(symbol, null);
+          record.quote.buy = price;
+          record.quote.shares = shares;
+          closeBuyEditor(record);
+          if (latest) render(latest);
+          else updateCard(record, record.quote);
+          setAddMessage("");
+          return;
+        }
+        const response = await fetch("/api/tickers/" + encodeURIComponent(symbol) + "/buy", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ price, shares }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || "Could not save buy price");
+        record.quote.buy = body.buy;
+        record.quote.shares = body.shares;
+        closeBuyEditor(record);
+        if (latest) render(latest);
+        else updateCard(record, record.quote);
+        setAddMessage("");
+      } catch (error) {
+        setAddMessage(error.message);
+      } finally {
+        record.buyInput.disabled = false;
+        record.sharesInput.disabled = false;
+      }
+    }
+
+    window.addEventListener("resize", () => {
+      if (!latest) return;
+      for (const quote of latest.quotes || []) {
+        const record = cards.get(quote.symbol);
+        if (record) draw(record.canvas, quote);
+      }
+    });
+
+    document.getElementById("add-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = document.getElementById("add-symbol");
+      const symbol = input.value.trim().toUpperCase();
+      if (!symbol) {
+        setAddMessage("Enter a ticker");
+        return;
+      }
+      input.disabled = true;
+      try {
+        await addTicker(symbol);
+        input.value = "";
+        setAddMessage(symbol + " added");
+      } catch (error) {
+        setAddMessage(error.message);
+      } finally {
+        input.disabled = false;
+        input.focus();
+      }
+    });
+
+    if (pagesMode) {
+      refreshClient();
+      setInterval(refreshClient, 5000);
+    } else {
+      const source = new EventSource("/events");
+      source.onmessage = (event) => {
+        try {
+          render(JSON.parse(event.data));
+        } catch (error) {
+          document.getElementById("status").textContent = "Could not read quote update";
+        }
+      };
+      source.onerror = () => {
+        document.getElementById("status").textContent = "Reconnecting…";
+      };
+    }
+  </script>
+</body>
+</html>
