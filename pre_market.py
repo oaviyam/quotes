@@ -139,11 +139,22 @@ def to_float(value):
         return None
 
 
-def is_premarket(status):
+def session_kind(status):
+    """Which quote the feed is printing: pre-market, the open session, or after hours."""
     if not status:
-        return False
+        return "closed"
     normalized = status.strip().lower().replace("_", "-").replace(" ", "-")
-    return normalized in {"pre-market", "premarket"}
+    if normalized in {"pre-market", "premarket"}:
+        return "pre"
+    if normalized in {"open", "market-open"}:
+        return "regular"
+    if normalized in {"after-hours", "afterhours", "post-market", "postmarket"}:
+        return "post"
+    return "closed"
+
+
+def is_premarket(status):
+    return session_kind(status) == "pre"
 
 
 def parse_payload(payload):
@@ -181,6 +192,7 @@ def parse_payload(payload):
         "delta_pct": delta_pct,
         "as_of": primary.get("lastTradeTimestamp") or "",
         "is_premarket": is_premarket(data.get("marketStatus")),
+        "session": session_kind(data.get("marketStatus")),
     }, None
 
 
@@ -271,13 +283,13 @@ async def refresh(state, session):
             logger.warning("%s: %s", symbol, error)
         elif parsed and parsed["price"] is not None:
             state.latest[symbol] = parsed
-            if parsed["is_premarket"]:
-                # First point is the prior close. Prints collected after that stay
-                # red while they are under that close, even if they tick up.
-                close = remember_close(state, symbol, parsed)
-                place_close_anchor(history, close, state.started_at)
-                history.append({"t": now, "p": parsed["price"]})
-                ok += 1
+            # Keep the same prior close as the baseline, and keep recording.
+            # Pre-market uses the pre-market print. Once the market is open the
+            # print is the regular session, then after-hours when that session starts.
+            close = remember_close(state, symbol, parsed)
+            place_close_anchor(history, close, state.started_at)
+            history.append({"t": now, "p": parsed["price"]})
+            ok += 1
         latest = state.latest.get(symbol) or {}
         source = parsed or latest
         if parsed and parsed.get("close") is not None:
@@ -290,12 +302,13 @@ async def refresh(state, session):
         if price is not None and display_close not in (None, 0):
             delta = price - display_close
             delta_pct = (delta / display_close) * 100
-        recording = bool(parsed and parsed["is_premarket"] and parsed["price"] is not None)
+        recording = bool(parsed and parsed["price"] is not None)
         quotes.append(
             {
                 "symbol": symbol,
                 "company": latest.get("company"),
                 "market_status": source.get("market_status"),
+                "session": source.get("session") or "closed",
                 "recording": recording,
                 "price": price,
                 "close": display_close,

@@ -525,6 +525,18 @@
       return record;
     }
 
+    function priceCaption(quote) {
+      if (quote.session === "pre") return "Pre-market";
+      if (quote.session === "regular") return "Market";
+      if (quote.session === "post") return "After-hours";
+      const status = quote.market_status || "";
+      const normalized = status.toLowerCase();
+      if (normalized.indexOf("pre") !== -1) return "Pre-market";
+      if (normalized === "open") return "Market";
+      if (normalized.indexOf("after") !== -1 || normalized.indexOf("post") !== -1) return "After-hours";
+      return status || "Last";
+    }
+
     function setText(node, text) {
       if (node.textContent !== text) node.textContent = text;
     }
@@ -534,7 +546,7 @@
       setText(record.company, quote.company || "");
       setText(record.pill, quote.market_status || "—");
       record.pill.classList.toggle("warn", !quote.recording);
-      setText(record.priceLabel, quote.recording ? "Pre-market" : (quote.market_status || "Last"));
+      setText(record.priceLabel, priceCaption(quote));
       setText(record.priceValue, formatPrice(quote.price));
       const deltaTone = tone(quote.delta);
       record.title.classList.remove("up", "down", "flat");
@@ -576,20 +588,12 @@
 
       const bits = [];
       if (quote.error) bits.push(quote.error);
-      if (!quote.recording) {
-        const status = quote.market_status || "unknown";
-        bits.push(
-          quote.points && quote.points.length
-            ? "Recording paused — " + status
-            : "Waiting for pre-market — " + status
-        );
-      }
       record.note.hidden = bits.length === 0;
       record.note.textContent = bits.join(" · ");
       const chartKey = chartSignature(quote, record.canvas);
       record.canvas.setAttribute(
         "aria-label",
-        quote.symbol + " pre-market chart, " + ((quote.points && quote.points.length) || 0) + " samples"
+        quote.symbol + " price chart, " + ((quote.points && quote.points.length) || 0) + " samples"
       );
       if (record.chartKey !== chartKey) {
         record.chartKey = chartKey;
@@ -797,12 +801,10 @@
       let price = regular;
       let close = previous;
       let status = "Closed";
-      let recording = false;
       if (session === "pre") {
         price = extended;
         close = regular;
         status = "Pre-Market";
-        recording = true;
       } else if (session === "regular") {
         price = regular;
         close = previous;
@@ -813,12 +815,10 @@
         status = "After-hours";
       }
       let points = clientHistory[symbol] || [];
-      if (recordPoint && recording && finite(price)) {
+      if (recordPoint && finite(price)) {
         points = clientHistory[symbol] || (clientHistory[symbol] = []);
-        if (finite(close)) {
-          const anchor = points.find((point) => point.anchor);
-          if (anchor) anchor.p = close;
-          else points.unshift({ t: clientStarted, p: close, anchor: true });
+        if (finite(close) && !points.some((point) => point.anchor)) {
+          points.unshift({ t: clientStarted, p: close, anchor: true });
         }
         points.push({ t: now, p: price });
       }
@@ -833,7 +833,8 @@
         symbol: symbol,
         company: meta.longName || meta.shortName || "",
         market_status: status,
-        recording: recording,
+        session: session,
+        recording: finite(price),
         price: finite(price) ? price : null,
         close: finite(close) ? close : null,
         delta: delta,
