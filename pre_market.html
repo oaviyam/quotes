@@ -291,7 +291,7 @@
   <div class="wrap">
     <header>
       <div>
-        <h1>Pre-market</h1>
+        <h1 id="board-title">Pre-market</h1>
         <p id="status">Loading quotes…</p>
         <form id="add-form" class="add-form">
           <input id="add-symbol" name="symbol" placeholder="Add ticker" maxlength="10" autocomplete="off" aria-label="Ticker symbol">
@@ -299,7 +299,7 @@
         </form>
         <p id="add-message" class="add-message"></p>
       </div>
-      <p class="legend"><span class="swatch up"></span>Above close<span class="swatch down"></span>Below close<span class="swatch close"></span>Close</p>
+      <p class="legend"><span class="swatch up"></span><span id="legend-above">Above close</span><span class="swatch down"></span><span id="legend-below">Below close</span><span class="swatch close"></span><span id="legend-base">Close</span></p>
     </header>
     <main id="board" class="board"></main>
   </div>
@@ -496,7 +496,7 @@
 
       const record = {
         article, company, pill, canvas, note, title, actions, deleteBtn,
-        priceLabel, priceValue, asof, closeValue, deltaPrice, deltaPct,
+        priceLabel, priceValue, asof, closeLabel, closeValue, deltaPrice, deltaPct,
         buyValue, buyLine, totalLine, editBtn, editor, buyInput, sharesInput,
         quote: null,
       };
@@ -554,6 +554,7 @@
       const priceClass = "price-value " + deltaTone;
       if (record.priceValue.className !== priceClass) record.priceValue.className = priceClass;
       setText(record.asof, quote.as_of || "");
+      setText(record.closeLabel, quote.baseline === "open" ? "Open" : "Close");
       setText(record.closeValue, formatPrice(quote.close));
       setText(record.deltaPrice, formatSigned(quote.delta, "$"));
       setText(record.deltaPct, formatPct(quote.delta_pct));
@@ -711,8 +712,25 @@
       }
     }
 
+    function boardTitle(quotes) {
+      const list = quotes || [];
+      const open = list.some((quote) => quote.session === "regular"
+        || (quote.market_status || "").toLowerCase() === "open");
+      if (open) return "Market";
+      const after = list.some((quote) => quote.session === "post");
+      if (after) return "After-hours";
+      return "Pre-market";
+    }
+
     function render(data) {
       latest = data;
+      const title = boardTitle(data.quotes);
+      setText(document.getElementById("board-title"), title);
+      if (document.title !== title) document.title = title;
+      const baseName = (data.quotes || []).some((quote) => quote.baseline === "open") ? "open" : "close";
+      setText(document.getElementById("legend-above"), "Above " + baseName);
+      setText(document.getElementById("legend-below"), "Below " + baseName);
+      setText(document.getElementById("legend-base"), baseName === "open" ? "Open" : "Close");
       const every = Number.isInteger(data.interval) ? String(data.interval) : String(data.interval);
       setText(
         document.getElementById("status"),
@@ -749,6 +767,8 @@
     let clientBoard = loadClientBoard();
     const clientHistory = {};
     const clientLatest = {};
+    const clientOpens = {};
+    let clientBaseline = null;
     const clientStarted = Date.now() / 1000;
     let clientBusy = false;
 
@@ -814,6 +834,10 @@
         close = regular;
         status = "After-hours";
       }
+      let baseline = clientBaseline || "close";
+      if (baseline === "open") {
+        close = finite(clientOpens[symbol]) ? clientOpens[symbol] : null;
+      }
       let points = clientHistory[symbol] || [];
       if (recordPoint && finite(price)) {
         points = clientHistory[symbol] || (clientHistory[symbol] = []);
@@ -837,6 +861,7 @@
         recording: finite(price),
         price: finite(price) ? price : null,
         close: finite(close) ? close : null,
+        baseline: baseline,
         delta: delta,
         delta_pct: deltaPct,
         as_of: "",
@@ -856,6 +881,7 @@
         recording: false,
         price: null,
         close: null,
+        baseline: clientBaseline || "close",
         delta: null,
         delta_pct: null,
         as_of: "",
@@ -864,6 +890,23 @@
         points: clientHistory[symbol] || [],
         error: message,
       };
+    }
+
+    async function fetchSessionOpen(symbol) {
+      const yahoo = "https://query1.finance.yahoo.com/v8/finance/chart/"
+        + symbol + "?interval=1d&range=1d";
+      const response = await fetch("https://r.jina.ai/" + yahoo);
+      if (!response.ok) return null;
+      const text = await response.text();
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start < 0 || end < start) return null;
+      const data = JSON.parse(text.slice(start, end + 1));
+      const opens = data.chart.result[0].indicators.quote[0].open || [];
+      for (let index = opens.length - 1; index >= 0; index -= 1) {
+        if (finite(opens[index]) && opens[index] > 0) return opens[index];
+      }
+      return null;
     }
 
     async function refreshClient() {
@@ -896,6 +939,22 @@
           }
         } catch (error) {
           failure = error.message || "Could not load quotes";
+        }
+        if (!clientBaseline) {
+          const sessions = Object.values(metas).map((meta) => sessionOf(meta, now));
+          if (sessions.indexOf("regular") !== -1) clientBaseline = "open";
+          else if (sessions.length) clientBaseline = "close";
+        }
+        if (clientBaseline === "open") {
+          for (const symbol of symbols) {
+            if (finite(clientOpens[symbol])) continue;
+            try {
+              const opened = await fetchSessionOpen(symbol);
+              if (finite(opened)) clientOpens[symbol] = opened;
+            } catch (error) {
+              // The next refresh tries this symbol again.
+            }
+          }
         }
         const quotes = symbols.map((symbol) => {
           const meta = metas[symbol] || clientLatest[symbol];

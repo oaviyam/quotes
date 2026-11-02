@@ -220,23 +220,54 @@ async def fetch_symbol(session, symbol):
 
 
 def remember_close(state, symbol, parsed):
-    """Keep the closing price from when the board starts.
+    """Keep the chart's starting price fixed after the first print.
 
-    Prefer the official prior close ("Closed at ...") over a secondary quote
-    that is still moving. Later polls do not shift the start of the graph.
+    A board that starts while the market is open uses today's open. Any other
+    start keeps the prior close. Later polls do not move that first point.
     """
+    locked = state.close_at_start.get(symbol)
+    if locked and locked.get("kind") == "open":
+        return locked["price"]
     close = parsed.get("close")
     official = bool(parsed.get("close_official"))
-    locked = state.close_at_start.get(symbol)
     if close is None:
         return None if locked is None else locked["price"]
     if locked is None:
-        state.close_at_start[symbol] = {"price": close, "official": official}
+        state.close_at_start[symbol] = {"price": close, "official": official, "kind": "close"}
         return close
-    if official and not locked["official"]:
+    if official and not locked["official"] and locked.get("kind") != "open":
         locked["price"] = close
         locked["official"] = True
     return locked["price"]
+
+
+async def fetch_session_open(http, symbol):
+    """Today's regular-session open. Used when the board itself starts during market hours."""
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d"
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+    try:
+        async with http.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            if response.status != 200:
+                return None
+            payload = await response.json(content_type=None)
+        opens = payload["chart"]["result"][0]["indicators"]["quote"][0]["open"]
+    except (asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError, KeyError, IndexError, TypeError):
+        return None
+    for value in reversed(opens or []):
+        price = to_float(value)
+        if price:
+            return price
+    return None
+
+
+def lock_baseline(state, symbol, parsed, opened):
+    locked = state.close_at_start.get(symbol)
+    if locked:
+        return locked["price"]
+    if state.baseline_kind == "open" and opened:
+        state.close_at_start[symbol] = {"price": opened, "official": True, "kind": "open"}
+        return opened
+    return remember_close(state, symbol, parsed)
 
 
 def place_close_anchor(history, close, started_at):
@@ -275,6 +306,17 @@ async def refresh(state, session):
     quotes = []
     ok = 0
     active = set(state.symbols)
+    if state.baseline_kind is None:
+        sessions = {parsed.get("session") for _, parsed, _ in results if parsed}
+        if "regular" in sessions:
+            state.baseline_kind = "open"
+        elif sessions:
+            state.baseline_kind = "close"
+    opens = {}
+    if state.baseline_kind == "open":
+        needed = [symbol for symbol in state.symbols if symbol not in state.close_at_start]
+        fetched = await asyncio.gather(*(fetch_session_open(session, symbol) for symbol in needed))
+        opens = dict(zip(needed, fetched))
     for symbol, parsed, error in results:
         if symbol not in active:
             continue
@@ -283,10 +325,9 @@ async def refresh(state, session):
             logger.warning("%s: %s", symbol, error)
         elif parsed and parsed["price"] is not None:
             state.latest[symbol] = parsed
-            # Keep the same prior close as the baseline, and keep recording.
-            # Pre-market uses the pre-market print. Once the market is open the
-            # print is the regular session, then after-hours when that session starts.
-            close = remember_close(state, symbol, parsed)
+            # The first point stays fixed: today's open if the board started
+            # during market hours, otherwise the prior close.
+            close = lock_baseline(state, symbol, parsed, opens.get(symbol))
             place_close_anchor(history, close, state.started_at)
             history.append({"t": now, "p": parsed["price"]})
             ok += 1
@@ -312,6 +353,7 @@ async def refresh(state, session):
                 "recording": recording,
                 "price": price,
                 "close": display_close,
+                "baseline": (locked.get("kind") or state.baseline_kind or "close"),
                 "delta": delta,
                 "delta_pct": delta_pct,
                 "as_of": latest.get("as_of"),
@@ -511,6 +553,7 @@ class BoardState:
         self.history = {symbol: [] for symbol in symbols}
         self.latest = {}
         self.close_at_start = {}
+        self.baseline_kind = None
         self.subscribers = set()
         self.snapshot = None
         self.started_at = time.time()
