@@ -223,6 +223,8 @@
     button.danger {
       background: #3a2228;
       color: #ffb4b4;
+      font-size: 11px;
+      padding: 2px 8px;
     }
 
     button.edit-buy {
@@ -239,8 +241,6 @@
       color: #e0b089;
       font-size: 12px;
     }
-
-    h2[role="button"] { cursor: pointer; }
 
     .title-wrap { min-width: 0; flex: 1; }
 
@@ -412,21 +412,15 @@
       const titleRow = el("div", "title-row");
       const title = el("h2");
       title.textContent = symbol;
-      title.tabIndex = 0;
-      title.setAttribute("role", "button");
-      title.setAttribute("aria-expanded", "false");
-      title.title = "Show delete";
-      const actions = el("div", "actions");
-      actions.hidden = true;
       const deleteBtn = el("button", "danger");
       deleteBtn.type = "button";
       deleteBtn.textContent = "Delete";
-      actions.append(deleteBtn);
+      deleteBtn.setAttribute("aria-label", "Delete " + symbol);
       const editBtn = el("button", "edit-buy");
       editBtn.type = "button";
       editBtn.textContent = "Edit";
       editBtn.title = "Set the price and how many shares you bought. Leave both blank to follow only.";
-      titleRow.append(title, editBtn, actions);
+      titleRow.append(title, editBtn, deleteBtn);
       const company = el("p", "company");
       titleWrap.append(titleRow, company);
       const pill = el("span", "pill");
@@ -495,22 +489,11 @@
       article.append(head, body);
 
       const record = {
-        article, company, pill, canvas, note, title, actions, deleteBtn,
+        article, company, pill, canvas, note, title, deleteBtn,
         priceLabel, priceValue, asof, closeLabel, closeValue, deltaPrice, deltaPct,
         buyValue, buyLine, totalLine, editBtn, editor, buyInput, sharesInput,
         quote: null,
       };
-      function toggleActions() {
-        actions.hidden = !actions.hidden;
-        title.setAttribute("aria-expanded", actions.hidden ? "false" : "true");
-      }
-      title.addEventListener("click", toggleActions);
-      title.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          toggleActions();
-        }
-      });
       deleteBtn.addEventListener("click", () => removeTicker(symbol, record));
       editBtn.addEventListener("click", () => openBuyEditor(record));
       editor.addEventListener("submit", (event) => {
