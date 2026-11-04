@@ -49,6 +49,14 @@
       letter-spacing: -0.02em;
     }
 
+    .holdings {
+      margin: 8px 0 0;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 22px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
     #status {
       margin: 6px 0 0;
       color: var(--muted);
@@ -292,6 +300,7 @@
     <header>
       <div>
         <h1 id="board-title">Pre-market</h1>
+        <p id="holdings" class="holdings">Holdings —</p>
         <p id="status">Loading quotes…</p>
         <form id="add-form" class="add-form">
           <input id="add-symbol" name="symbol" placeholder="Add ticker" maxlength="10" autocomplete="off" aria-label="Ticker symbol">
@@ -705,6 +714,19 @@
       return "Pre-market";
     }
 
+    function holdingsTotal(quotes) {
+      let pnl = 0;
+      let cost = 0;
+      let count = 0;
+      for (const quote of quotes || []) {
+        if (!finite(quote.buy) || quote.buy <= 0 || !finite(quote.shares) || !finite(quote.price)) continue;
+        pnl += (quote.price - quote.buy) * quote.shares;
+        cost += quote.buy * quote.shares;
+        count += 1;
+      }
+      return { pnl: pnl, cost: cost, count: count };
+    }
+
     function render(data) {
       latest = data;
       const title = boardTitle(data.quotes);
@@ -714,6 +736,19 @@
       setText(document.getElementById("legend-above"), "Above " + baseName);
       setText(document.getElementById("legend-below"), "Below " + baseName);
       setText(document.getElementById("legend-base"), baseName === "open" ? "Open" : "Close");
+      const holdings = holdingsTotal(data.quotes);
+      const holdingsNode = document.getElementById("holdings");
+      if (!holdings.count) {
+        setText(holdingsNode, "Holdings —");
+        holdingsNode.className = "holdings flat";
+      } else {
+        const pct = holdings.cost ? (holdings.pnl / holdings.cost) * 100 : null;
+        setText(
+          holdingsNode,
+          "Holdings " + formatSigned(holdings.pnl, "$") + (finite(pct) ? "  " + formatPct(pct) : "")
+        );
+        holdingsNode.className = "holdings " + tone(holdings.pnl);
+      }
       const every = Number.isInteger(data.interval) ? String(data.interval) : String(data.interval);
       setText(
         document.getElementById("status"),
